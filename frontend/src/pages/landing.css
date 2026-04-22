@@ -1,0 +1,143 @@
+.landing-container {
+  margin: 0;
+  background-color: #000;
+  color: white;
+  overflow-x: hidden; 
+}
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 5%;
+  background: var(--nav-bg);
+  height: 70px;
+  width: 100%;
+}
+
+.logo {
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  font-weight: bold;
+  padding: 2%;
+}
+
+.nav-links {
+  display: flex;
+  gap: clamp(10px, 2vw, 20px);
+  align-items: center;
+}
+
+.nav-links a {
+  color: #ccc;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+
+.hero-section {
+  min-height: calc(100vh - 70px);
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  display: flex;
+}
+
+.overlay {
+  background: rgba(0, 0, 0, 0.65);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.hero-content {
+  text-align: center;
+  width: 100%;
+  max-width: 900px; 
+  padding: clamp(20px, 5vw, 50px);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); 
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
+
+h1 {
+  font-size: clamp(1.8rem, 6vw, 3rem);
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: clamp(1.2rem, 4vw, 2rem);
+  font-style: italic;
+  margin-bottom: 1rem;
+  color: #e0e0e0;
+}
+
+.description {
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  margin-bottom: 2rem;
+  opacity: 0.8;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.video-card {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.ui-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.btn-primary, .btn-get-started {
+  background: var(--primary-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.btn-get-started {
+  padding: 16px 50px;
+  font-size: 1.1rem;
+  width: auto;
+}
+
+@media (max-width: 480px) {
+  .btn-get-started {
+    width: 100%; 
+  }
+}
+
+.btn-secondary {
+  background: transparent;
+  color: white;
+  border: 1px solid white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  padding: 8px 16px;
+}
+
+.btn-primary:hover, .btn-get-started:hover {
+  background: var(--hover-blue);
+  transform: translateY(-2px);
+}

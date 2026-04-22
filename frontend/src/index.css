@@ -1,0 +1,14 @@
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box; 
+  font-family: 'Inter', sans-serif;
+}
+
+:root {
+  --primary-blue: #2563eb;
+  --hover-blue: #1d4ed8;
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --nav-bg: #1a1a1a;
+}
+

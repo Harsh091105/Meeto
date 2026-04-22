@@ -1,0 +1,186 @@
+body {
+  margin: 0;
+  background: #121212;
+  font-family: Arial, sans-serif;
+  color: white;
+}
+
+/* GRID LAYOUT */
+.videoGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  padding: 20px;
+  margin-bottom: 120px; /* space for controls */
+}
+
+/* EACH VIDEO CARD */
+.videoBox {
+  position: relative;
+  background: black;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 1 1 300px; /* responsive magic */
+  max-width: 350px;
+  min-width: 250px;
+}
+
+.videoBox video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* NAME TAG */
+.nameTag {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  background: rgba(0,0,0,0.6);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* CONTROL BAR */
+.controlBar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  background: rgba(30,30,30,0.95);
+  padding: 15px 25px;
+  border-radius: 40px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+/* BUTTONS */
+.controlBtn {
+  background: #2c2c2c;
+  border: none;
+  color: white;
+  padding: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.controlBtn:hover {
+  background: #444;
+}
+
+.endCall {
+  background: #d93025;
+}
+
+.chatBtn {
+  position: relative;
+}
+
+.chatBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: red;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 50%;
+}
+
+/* 📱 MOBILE */
+@media (max-width: 600px) {
+  .videoBox {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .controlBar {
+    gap: 10px;
+    padding: 12px 18px;
+  }
+}
+
+.videoBox { position: relative; }
+
+.micIndicator {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 50%;
+  padding: 6px;
+  color: white;
+}
+
+.muted { color: red; }
+
+.chatPanel {
+  position: fixed;
+  right: 20px;
+  bottom: 100px;
+  width: 300px;
+  height: 400px;
+  background: #1e1e1e;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 15px rgba(0,0,0,0.5);
+}
+
+.chatHeader {
+  padding: 10px;
+  background: #2c2c2c;
+  text-align: center;
+  font-weight: bold;
+}
+
+.chatMessages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.chatMsg {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.chatMsg p {
+  background: #333;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.myMsg {
+  text-align: right;
+}
+
+.myMsg p {
+  background: #4caf50;
+}
+
+.chatInputBox {
+  display: flex;
+  border-top: 1px solid #333;
+}
+
+.chatInputBox input {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  outline: none;
+  background: #2c2c2c;
+  color: white;
+}
+
+.chatInputBox button {
+  padding: 8px 12px;
+  border: none;
+  background: #4caf50;
+  color: white;
+  cursor: pointer;
+}
