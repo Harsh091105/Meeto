@@ -22,6 +22,10 @@ app.use(express.urlencoded({limit:"40kb",extended:true}));
 app.use("/api/v1/users",userRoutes);
 app.use("/api/v1/meetings", meetingRoutes);
 
+app.get("/", (req, res) => {
+    return res.json({ "message": "Backend is up and running!" });
+});
+
 app.get("/home",(req,res)=>{
     return res.json({"hello":"world"})
 });
