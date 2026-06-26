@@ -1,50 +1,67 @@
-# Real-Time Video Conferencing Platform
+# Meeto: Next-Gen Video Collaboration
+A completely custom-built, full-stack web application engineered for instant, decentralized video conferencing using advanced WebRTC and Socket.io pipelines.
 
-A high-performance, full-stack web application engineered for ultra-low latency, peer-to-peer (P2P) video and audio communication. This platform leverages WebRTC for direct media transport and a custom Socket.io signaling server for seamless connection management.
+## Project Overview
+Meeto was developed from the ground up to solve the complexities of real-time communication. Rather than relying on third-party video APIs, this platform handles raw media streams directly in the browser, offering users an ultra-low latency environment to host meetings, share screens, and exchange text messages. The architecture prioritizes data privacy, instant state reflection, and seamless media hardware management.
 
-## 🚀 Features
+## Core Capabilities
+* **Peer-to-Peer Media Routing:** Leverages native WebRTC APIs to establish direct browser-to-browser connections, drastically reducing latency for video and audio transmission.
+* **Instantaneous Text Chat:** Integrated a customized Socket.io event loop to power a lightning-fast, bidirectional chat room that operates in parallel with the video streams.
+* **Live Room State Engine:** Built a centralized memory layer on the Node.js server that perfectly synchronizes hardware statuses (like who is currently muted or hiding their camera) the exact moment a new participant enters the lobby.
+* **Cryptographic Meeting Security:** Dropped traditional URL guessing by implementing a MongoDB-backed verification layer. Every meeting code is cryptographically validated via a REST API before any media permissions are even requested.
+* **Smart Device Caching:** Programmed the client-side React app to remember user hardware preferences using `sessionStorage`, ensuring your microphone and camera settings survive accidental page reloads.
+* **Fluid Interface Design:** Crafted a fully adaptive UI from scratch. The interface intelligently morphs between desktop grid layouts and stacked mobile views without sacrificing usability.
 
-* **Ultra-Low Latency Media Streaming:** Utilizes WebRTC for direct P2P audio and video transmission, bypassing traditional server relays for near-instant communication.
-* **Dynamic Room Management:** A custom bi-directional signaling server manages concurrent user connections, dynamic room generation, and real-time state synchronization across all participants.
-* **Secure Authentication:** Robust user authentication pipeline using Bcrypt for password hashing and Node's native Crypto module for secure session tokens.
-* **Responsive, High-Performance UI:** Built with React and Vite for blazing-fast Hot Module Replacement (HMR) during development and highly optimized asset bundling for production.
-* **Persistent Data Storage:** Securely persists user profiles, room metadata, and authentication states within a MongoDB NoSQL database.
+## Technology Blueprint
+| Architecture Layer | Core Tools & Frameworks |
+| --- | --- |
+| **Client-Side** | React.js, React Router, CSS3 Flexbox/Grid, Vanilla JS |
+| **Server-Side** | Node.js, Express.js |
+| **Database Ecosystem** | MongoDB, Mongoose ODM |
+| **Real-Time Web** | Socket.io (WebSocket), WebRTC (`RTCPeerConnection`) |
+| **Security & Auth** | bcrypt (password hashing), crypto, custom session management |
+| **Dev Environment** | cors, dotenv, nodemon |
 
-## 🛠️ Tech Stack
+## Key Engineering Milestones
+* **Decentralized Mesh Networking:** Successfully engineered a multi-node WebRTC mesh topology. By handling ICE candidate negotiation and SDP (Session Description Protocol) handshakes manually, the app supports multi-party calls without bottlenecking a central media server.
+* **Eradicating "Late-Joiner" Desync:** Solved a notorious WebRTC state bug where newly connected users see incorrect UI states. I fixed this by packing comprehensive "State Profiles" directly into the initial Socket connection payloads.
+* **Dynamic Track Swapping:** Wrote logic to instantly hot-swap active `MediaStream` tracks on the fly. This allows users to switch between webcam feeds and screen sharing without ever tearing down and rebuilding the underlying peer connection.
+* **Pre-Mount Authorization:** Secured the React component lifecycle by enforcing backend API validation *before* the video interface is allowed to render, instantly kicking out unauthorized viewers.
+* **Environment Isolation:** Shielded all proprietary database connections and server secrets using strict environment variable parsing (`dotenv`).
 
-**Frontend:**
-* React.js
-* Vite (Bundler)
-* Axios (REST API communication)
-* Custom CSS (Responsive video grid architecture)
+## Run It Locally
 
-**Backend:**
-* Node.js & Express.js
-* Socket.io (WebSocket signaling server)
-* WebRTC (P2P media transport & NAT traversal via ICE)
-* Bcrypt & Crypto (Security & Hashing)
+**1. Pull the Source Code:**
+```bash
+git clone https://github.com/Harsh091105/Meeto.git
+cd Meeto
+```
 
-**Database:**
-* MongoDB (Atlas)
-* Mongoose (ODM)
+**2. Boot up the Backend:**
+Open your terminal and step into the server directory:
+```bash
+cd backend
+npm install
+```
+Create a hidden `.env` file inside the `backend` folder and link your MongoDB cluster:
+```env
+MONGO_URI=your_personal_mongodb_connection_string
+PORT=8080
+```
+Launch the server environment:
+```bash
+npm run dev
+```
 
-## ⚙️ Architecture Overview
+**3. Launch the Frontend UI:**
+Open a brand new terminal tab and step into the client directory:
+```bash
+cd frontend
+npm install
+```
+Fire up the React development server:
+```bash
+npm run dev
+```
 
-1. **Signaling Phase:** When a user joins a room, the React client connects to the Node.js/Socket.io server. The server acts as a middleman to exchange SDP (Session Description Protocol) offers, answers, and ICE candidates between peers.
-2. **P2P Connection:** Once signaling is complete, a direct WebRTC `RTCPeerConnection` is established between the browsers.
-3. **Media Transport:** Video and audio tracks are captured via the browser's `getUserMedia` API and streamed directly between peers, ensuring maximum privacy and minimum latency.
-
-## 💻 Getting Started
-
-### Prerequisites
-Make sure you have the following installed on your local machine:
-* [Node.js](https://nodejs.org/) (v16 or higher)
-* [Git](https://git-scm.com/)
-* A [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) account (or local MongoDB instance)
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/YourUsername/YourRepositoryName.git](https://github.com/YourUsername/YourRepositoryName.git)
-   cd YourRepositoryName
+Your browser should automatically open, or you can manually navigate to `http://localhost:5173` to start your first meeting!

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
+import axios from "axios";
 import "./VideoMeet.css";
 
 import MicIcon from "@mui/icons-material/Mic";
@@ -11,13 +13,15 @@ import CallEndIcon from "@mui/icons-material/CallEnd";
 import ChatIcon from "@mui/icons-material/Chat";
 
 const server_url = "http://localhost:8080";
-const connections = {};
+const activePeerNetwork = {};
 const peerConfigConnections = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
 let blackTrack = null;
 let silentTrack = null;
+let currentVideoTrack = null;
+let localCamTrack = null;
 
 /* ---------- Track Helpers ---------- */
 const createBlackTrack = () => {
@@ -40,7 +44,43 @@ const createSilentTrack = () => {
     return track;
 };
 
+// Video component to prevent flickering on re-renders
+const RemoteVideo = ({ video }) => {
+    const videoRef = useRef();
+
+    useEffect(() => {
+        const playStream = () => {
+            if (videoRef.current && video.stream) {
+                videoRef.current.srcObject = null; // Clear it to force the browser to re-evaluate the tracks
+                videoRef.current.srcObject = video.stream;
+                videoRef.current.play().catch(e => console.warn("Autoplay prevented:", e));
+            }
+        };
+
+        playStream();
+
+        if (video.stream) {
+            video.stream.onaddtrack = () => {
+                playStream();
+            };
+        }
+    }, [video.stream]);
+
+    return (
+        <div className="videoBox">
+            <video autoPlay playsInline ref={videoRef} />
+            <span className="nameTag">{video.username || video.socketId}</span>
+            <div className="micIndicator" style={{ display: 'flex', gap: '5px' }}>
+                {video.isMicOn ? <MicIcon /> : <MicOffIcon className="muted" />}
+                {video.isCamOn ? <VideocamIcon /> : <VideocamOffIcon className="muted" />}
+            </div>
+        </div>
+    );
+};
+
 export default function VideoMeetComponent() {
+    const navigate = useNavigate();
+    const { url } = useParams();
     const socketRef = useRef();
     const socketIdRef = useRef();
     const localVideoRef = useRef();
@@ -48,41 +88,72 @@ export default function VideoMeetComponent() {
     const [videos, setVideos] = useState([]);
     const [askForUsername, setAskForUsername] = useState(true);
     const [username, setUsername] = useState("");
-    const [isMicOn, setIsMicOn] = useState(true);
-    const [isCamOn, setIsCamOn] = useState(true);
+    const [isMicOn, setIsMicOn] = useState(() => sessionStorage.getItem("meeto_mic") !== "false");
+    const [isCamOn, setIsCamOn] = useState(() => sessionStorage.getItem("meeto_cam") !== "false");
     const [isScreenSharing, setIsScreenSharing] = useState(false);
 
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [chatInput, setChatInput] = useState("");
 
-
     const getPermissions = async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        window.localStream = stream;
-        localVideoRef.current.srcObject = stream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            window.localStream = stream;
+            localCamTrack = stream.getVideoTracks()[0];
+            
+            const audioTrack = stream.getAudioTracks()[0];
+            const initialMic = sessionStorage.getItem("meeto_mic") !== "false";
+            const initialCam = sessionStorage.getItem("meeto_cam") !== "false";
+            
+            if (audioTrack && !initialMic) {
+                audioTrack.enabled = false;
+            }
+            
+            if (localCamTrack && !initialCam) {
+                localCamTrack.enabled = false;
+                if (!blackTrack) blackTrack = createBlackTrack();
+                currentVideoTrack = blackTrack;
+            } else {
+                currentVideoTrack = localCamTrack;
+            }
+
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            console.error("Error getting media permissions:", err);
+        }
     };
 
-    const gotMessageFromServer = async (fromId, message) => {
-        const signal = JSON.parse(message);
-        if (fromId === socketIdRef.current) return;
-        const pc = connections[fromId];
-        if (!pc) return;
+    /**
+     * WebRTC SDP & ICE Candidate signaling processor.
+     * Parses the incoming socket relay and injects candidates into the local peer connection.
+     */
+    const processIncomingSignalingPayload = async (senderIdentity, payloadData) => {
+        const parsedSignal = JSON.parse(payloadData);
+        if (senderIdentity === socketIdRef.current) return;
+        
+        const peerInstance = activePeerNetwork[senderIdentity];
+        if (!peerInstance) return;
 
-        if (signal.sdp) {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            if (signal.sdp.type === "offer") {
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: pc.localDescription }));
+        if (parsedSignal.sdp) {
+            await peerInstance.setRemoteDescription(new RTCSessionDescription(parsedSignal.sdp));
+            if (parsedSignal.sdp.type === "offer") {
+                const answerPayload = await peerInstance.createAnswer();
+                await peerInstance.setLocalDescription(answerPayload);
+                socketRef.current.emit("signal", senderIdentity, JSON.stringify({ sdp: peerInstance.localDescription }));
             }
         }
-        if (signal.ice) await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
+        if (parsedSignal.ice) {
+            await peerInstance.addIceCandidate(new RTCIceCandidate(parsedSignal.ice));
+        }
     };
 
-    const connectToSocketServer = () => {
+    const initializeRealtimeMesh = () => {
+        const activeAlias = sessionStorage.getItem("meeto_username") || username || "User";
         socketRef.current = io.connect(server_url);
-        socketRef.current.on("signal", gotMessageFromServer);
+        socketRef.current.on("signal", processIncomingSignalingPayload);
 
         socketRef.current.on("chat-message", (data, sender, senderId) => {
             setMessages(prev => [
@@ -101,22 +172,31 @@ export default function VideoMeetComponent() {
             setVideos((prev) => prev.map((v) => v.socketId === socketId ? { ...v, isMicOn } : v));
         });
 
+        socketRef.current.on("cam-status-change", ({ socketId, isCamOn }) => {
+            setVideos((prev) => prev.map((v) => v.socketId === socketId ? { ...v, isCamOn } : v));
+        });
+
         socketRef.current.on("connect", () => {
             socketIdRef.current = socketRef.current.id;
-            socketRef.current.emit("join-call", window.location.href);
+            
+            // Pass the exact initial states directly in the join-call payload
+            socketRef.current.emit("join-call", window.location.href, currentUsername, {
+                isMicOn: sessionStorage.getItem("meeto_mic") !== "false",
+                isCamOn: sessionStorage.getItem("meeto_cam") !== "false"
+            });
             
             
             socketRef.current.on("user-left", (id) => {
-                if (connections[id]) connections[id].close();
-                delete connections[id];
+                if (activePeerNetwork[id]) activePeerNetwork[id].close();
+                delete activePeerNetwork[id];
                 setVideos((v) => v.filter((video) => video.socketId !== id));
             });
 
-            socketRef.current.on("user-joined", (id, clients) => {
+            socketRef.current.on("user-joined", (id, clients, roomUsers) => {
                 clients.forEach((socketListId) => {
-                    if (!connections[socketListId]) {
+                    if (!activePeerNetwork[socketListId]) {
                         const pc = new RTCPeerConnection(peerConfigConnections);
-                        connections[socketListId] = pc;
+                        activePeerNetwork[socketListId] = pc;
 
                         pc.onicecandidate = (event) => {
                             if (event.candidate)
@@ -127,18 +207,27 @@ export default function VideoMeetComponent() {
                             const remoteStream = event.streams[0];
                             setVideos((prev) => {
                                 if (prev.find((v) => v.socketId === socketListId)) return prev;
-                                return [...prev, { socketId: socketListId, stream: remoteStream, isMicOn: true }];
+                                
+                                // Safely extract state from roomUsers if it exists
+                                const remoteUserData = (roomUsers && roomUsers[socketListId]) ? roomUsers[socketListId] : null;
+                                const remoteUsername = remoteUserData ? remoteUserData.username : socketListId;
+                                const remoteIsMicOn = remoteUserData ? remoteUserData.isMicOn : true;
+                                const remoteIsCamOn = remoteUserData ? remoteUserData.isCamOn : true;
+                                
+                                return [...prev, { socketId: socketListId, stream: remoteStream, isMicOn: remoteIsMicOn, isCamOn: remoteIsCamOn, username: remoteUsername }];
                             });
                         };
 
-                        window.localStream.getTracks().forEach((track) => pc.addTrack(track, window.localStream));
+                        const audioTrack = window.localStream.getAudioTracks()[0];
+                        if (audioTrack) pc.addTrack(audioTrack, window.localStream);
+                        if (currentVideoTrack) pc.addTrack(currentVideoTrack, window.localStream);
                     }
                 });
 
                 if (id === socketIdRef.current) {
-                    for (let id2 in connections) {
+                    for (let id2 in activePeerNetwork) {
                         if (id2 === socketIdRef.current) continue;
-                        const pc = connections[id2];
+                        const pc = activePeerNetwork[id2];
                         if (pc.signalingState !== "stable") continue;
                         pc.createOffer()
                             .then((desc) => pc.setLocalDescription(desc))
@@ -150,9 +239,14 @@ export default function VideoMeetComponent() {
     };
 
     const connect = async () => {
+        if (!username.trim()) {
+            alert("Please enter a username to join the lobby.");
+            return;
+        }
+        sessionStorage.setItem("meeto_username", username);
         setAskForUsername(false);
         await getPermissions();
-        connectToSocketServer();
+        initializeRealtimeMesh();
     };
 
     /* ---------- MIC TOGGLE ---------- */
@@ -162,6 +256,7 @@ export default function VideoMeetComponent() {
   audioTrack.enabled = newState;
 
   setIsMicOn(newState);
+  sessionStorage.setItem("meeto_mic", newState);
 
   socketRef.current.emit("mic-status-change", {
     socketId: socketIdRef.current,
@@ -177,12 +272,18 @@ export default function VideoMeetComponent() {
         videoTrack.enabled = !turningOff;
         if (!blackTrack) blackTrack = createBlackTrack();
 
-        Object.values(connections).forEach((pc) => {
+        Object.values(activePeerNetwork).forEach((pc) => {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
             if (sender) sender.replaceTrack(turningOff ? blackTrack : videoTrack);
         });
 
         setIsCamOn(!turningOff);
+        sessionStorage.setItem("meeto_cam", !turningOff);
+
+        socketRef.current.emit("cam-status-change", {
+            socketId: socketIdRef.current,
+            isCamOn: !turningOff
+        });
     };
 
     /* ---------- SCREEN SHARE ---------- */
@@ -191,16 +292,27 @@ export default function VideoMeetComponent() {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
             const screenTrack = screenStream.getVideoTracks()[0];
 
-            Object.values(connections).forEach((pc) => {
+            currentVideoTrack = screenTrack;
+            
+            // Update local video element
+            const newLocalStream = new MediaStream([currentVideoTrack, window.localStream.getAudioTracks()[0]]);
+            localVideoRef.current.srcObject = newLocalStream;
+
+            // Update existing connections
+            Object.values(activePeerNetwork).forEach((pc) => {
                 const sender = pc.getSenders().find((s) => s.track?.kind === "video");
                 if (sender) sender.replaceTrack(screenTrack);
             });
 
+            // When user clicks "Stop Sharing" on the browser popup
             screenTrack.onended = () => {
-                const camTrack = window.localStream.getVideoTracks()[0];
-                Object.values(connections).forEach((pc) => {
+                currentVideoTrack = localCamTrack;
+                const restoredStream = new MediaStream([currentVideoTrack, window.localStream.getAudioTracks()[0]]);
+                localVideoRef.current.srcObject = restoredStream;
+
+                Object.values(activePeerNetwork).forEach((pc) => {
                     const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-                    if (sender) sender.replaceTrack(camTrack);
+                    if (sender) sender.replaceTrack(localCamTrack);
                 });
                 setIsScreenSharing(false);
             };
@@ -210,9 +322,21 @@ export default function VideoMeetComponent() {
     };
 
     const endCall = () => {
-        Object.values(connections).forEach((pc) => pc.close());
-        socketRef.current.disconnect();
-        window.location.reload();
+        Object.values(activePeerNetwork).forEach((pc) => pc.close());
+        for (let key in activePeerNetwork) delete activePeerNetwork[key];
+        if (socketRef.current) socketRef.current.disconnect();
+        
+        // Turn off camera and mic
+        if (window.localStream) {
+            window.localStream.getTracks().forEach((track) => track.stop());
+        }
+        
+        // Remove from session storage so auto-rejoin doesn't trigger
+        sessionStorage.removeItem("meeto_username");
+        sessionStorage.removeItem("meeto_mic");
+        sessionStorage.removeItem("meeto_cam");
+        
+        navigate("/"); // Redirect to landing page
     };
 
     const sendMessage = () => {
@@ -226,8 +350,39 @@ export default function VideoMeetComponent() {
 
 
     useEffect(() => {
+        let isMounted = true;
+
+        const validateRoom = async () => {
+            try {
+                const response = await axios.get(`http://localhost:8080/api/v1/meetings/validate/${url}`);
+                if (response.status === 200) {
+                    const storedUsername = sessionStorage.getItem("meeto_username");
+                    
+                    if (storedUsername) {
+                        setUsername(storedUsername);
+                        setAskForUsername(false);
+                        const init = async () => {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            if (!isMounted) return;
+                            await getPermissions();
+                            if (!isMounted) return;
+                            connectToSocketServer();
+                        };
+                        init();
+                    }
+                }
+            } catch (error) {
+                alert("Invalid Meeting Code.");
+                navigate("/");
+            }
+        };
+
+        validateRoom();
+
         return () => {
-            Object.values(connections).forEach((pc) => pc.close());
+            isMounted = false;
+            Object.values(activePeerNetwork).forEach((pc) => pc.close());
+            for (let key in activePeerNetwork) delete activePeerNetwork[key];
             if (socketRef.current) socketRef.current.disconnect();
         };
     }, []);
@@ -235,11 +390,27 @@ export default function VideoMeetComponent() {
     return (
         <div>
             {askForUsername ? (
-                <div>
-                    <h2>Enter Lobby</h2>
-                    <input value={username} onChange={(e) => setUsername(e.target.value)} />
-                    <button onClick={connect}>Connect</button>
-                    <video ref={localVideoRef} autoPlay muted />
+                <div className="lobby-container">
+                    <div className="lobby-content">
+                        <h2>Enter Lobby</h2>
+                        <div className="lobby-code-box">
+                            <p>Meeting Code: <strong>{url}</strong></p>
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(url);
+                                    alert("Meeting code copied to clipboard!");
+                                }} 
+                                className="copy-btn"
+                            >
+                                Copy Code
+                            </button>
+                        </div>
+                        <input className="lobby-input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your Name" />
+                        <button className="lobby-connect-btn" onClick={connect}>Connect</button>
+                    </div>
+                    <div className="lobby-video-preview">
+                        <video ref={localVideoRef} autoPlay muted playsInline />
+                    </div>
                 </div>
             ) : (
                 <>
@@ -301,15 +472,14 @@ export default function VideoMeetComponent() {
                         <div className="videoBox">
                             <video ref={localVideoRef} autoPlay muted />
                             <span className="nameTag">You</span>
-                            <div className="micIndicator">{isMicOn ? <MicIcon /> : <MicOffIcon className="muted" />}</div>
+                            <div className="micIndicator" style={{ display: 'flex', gap: '5px' }}>
+                                {isMicOn ? <MicIcon /> : <MicOffIcon className="muted" />}
+                                {isCamOn ? <VideocamIcon /> : <VideocamOffIcon className="muted" />}
+                            </div>
                         </div>
 
                         {videos.map((v) => (
-                            <div className="videoBox" key={v.socketId}>
-                                <video autoPlay playsInline ref={(el) => el && (el.srcObject = v.stream)} />
-                                <span className="nameTag">{v.socketId}</span>
-                                <div className="micIndicator">{v.isMicOn ? <MicIcon /> : <MicOffIcon className="muted" />}</div>
-                            </div>
+                            <RemoteVideo key={v.socketId} video={v} />
                         ))}
                     </div>
                 </>

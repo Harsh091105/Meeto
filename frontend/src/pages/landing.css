@@ -118,9 +118,21 @@ h1 {
   width: auto;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .btn-get-started {
     width: 100%; 
+  }
+  
+  .join-box {
+    flex-direction: column;
+    width: 100%;
+    padding: 0 20px;
+    box-sizing: border-box;
+  }
+  
+  .join-box input {
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 
@@ -140,4 +152,40 @@ h1 {
 .btn-primary:hover, .btn-get-started:hover {
   background: var(--hover-blue);
   transform: translateY(-2px);
+}
+
+/* ---------- Join Box Styles ---------- */
+.join-box {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 30px;
+}
+
+.join-box input {
+  padding: 16px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 1.1rem;
+  outline: none;
+  width: 250px;
+  transition: border 0.3s;
+}
+
+.join-box input:focus {
+  border: 1px solid var(--primary-blue, #4e8cff);
+}
+
+/* Fix browser autofill background color */
+.join-box input:-webkit-autofill,
+.join-box input:-webkit-autofill:hover, 
+.join-box input:-webkit-autofill:focus, 
+.join-box input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px rgba(0,0,0,0.5) inset !important;
+  -webkit-text-fill-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

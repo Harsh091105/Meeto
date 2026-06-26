@@ -1,11 +1,17 @@
 import { Server } from "socket.io";
 
-let connections = {};
-let messages = {};
-let timeOnLine = {};
+/**
+ * Custom WebRTC Signaling & State Management Server
+ * Refactored to implement advanced peer tracking and optimized media state caching.
+ */
+let activePeerNetwork = {};
+let roomMessageCache = {};
+let peerConnectionTimestamps = {};
+let clientIdentityMap = {};
+let clientHardwareStateMap = {};
 
-export const connectToSocket = (server) => {
-    const io = new Server(server, {
+export const connectToSocket = (httpServer) => {
+    const ioServer = new Server(httpServer, {
         cors: {
             origin: "*",
             methods: ["GET", "POST"],
@@ -14,87 +20,141 @@ export const connectToSocket = (server) => {
         }
     });
 
-    io.on("connection", (socket) => {
+    ioServer.on("connection", (clientSocket) => {
+        console.log(`[Socket.io] New client connected: ${clientSocket.id}`);
 
-        console.log("SOMETHING CONNECTED");
-
-        socket.on("mic-status-change", (data) => {
-            socket.broadcast.emit("mic-status-change", data);
+        /**
+         * Handle microphone hardware toggles and sync with the active mesh.
+         */
+        clientSocket.on("mic-status-change", (payload) => {
+            const { socketId, isMicOn } = payload;
+            if (clientHardwareStateMap[socketId]) {
+                clientHardwareStateMap[socketId].isMicOn = isMicOn;
+            } else {
+                clientHardwareStateMap[socketId] = { isMicOn, isCamOn: true };
+            }
+            clientSocket.broadcast.emit("mic-status-change", payload);
         });
 
-        socket.on("join-call", (path) => {
-            if (connections[path] === undefined) {
-                connections[path] = [];
+        /**
+         * Handle camera hardware toggles and sync with the active mesh.
+         */
+        clientSocket.on("cam-status-change", (payload) => {
+            const { socketId, isCamOn } = payload;
+            if (clientHardwareStateMap[socketId]) {
+                clientHardwareStateMap[socketId].isCamOn = isCamOn;
+            } else {
+                clientHardwareStateMap[socketId] = { isMicOn: true, isCamOn };
             }
-            connections[path].push(socket.id);
-            timeOnLine[socket.id] = new Date();
+            clientSocket.broadcast.emit("cam-status-change", payload);
+        });
 
-            for (let a = 0; a < connections[path].length; a++) {
-                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path]);
+        /**
+         * Core initialization pipeline for new peers joining a room.
+         */
+        clientSocket.on("join-call", (roomIdentifier, alias, hardwareDefaults) => {
+            if (alias) {
+                clientIdentityMap[clientSocket.id] = alias;
             }
+            
+            clientHardwareStateMap[clientSocket.id] = { 
+                isMicOn: hardwareDefaults?.isMicOn ?? true, 
+                isCamOn: hardwareDefaults?.isCamOn ?? true 
+            };
 
-            if (messages[path] !== undefined) {
-                for (let a = 0; a < messages[path].length; ++a) {
-                    io.to(socket.id).emit("chat-message",
-                        messages[path][a]['data'],
-                        messages[path][a]['sender'],
-                        messages[path][a]['socket-id-sender']
+            if (!activePeerNetwork[roomIdentifier]) {
+                activePeerNetwork[roomIdentifier] = [];
+            }
+            activePeerNetwork[roomIdentifier].push(clientSocket.id);
+            peerConnectionTimestamps[clientSocket.id] = Date.now();
+
+            // Construct state snapshot for all peers currently in the room
+            const currentRoomState = activePeerNetwork[roomIdentifier].reduce((acc, peerId) => {
+                acc[peerId] = {
+                    username: clientIdentityMap[peerId] || peerId,
+                    isMicOn: clientHardwareStateMap[peerId]?.isMicOn ?? true,
+                    isCamOn: clientHardwareStateMap[peerId]?.isCamOn ?? true
+                };
+                return acc;
+            }, {});
+
+            // Broadcast the new peer event to everyone in this room
+            activePeerNetwork[roomIdentifier].forEach((peerId) => {
+                ioServer.to(peerId).emit("user-joined", clientSocket.id, activePeerNetwork[roomIdentifier], currentRoomState);
+            });
+
+            // Dispatch cached messages to the newly joined peer
+            if (roomMessageCache[roomIdentifier]) {
+                roomMessageCache[roomIdentifier].forEach((cachedMsg) => {
+                    ioServer.to(clientSocket.id).emit("chat-message",
+                        cachedMsg.data,
+                        cachedMsg.sender,
+                        cachedMsg.socketIdSender
                     );
-                }
-            }
-        });
-
-        socket.on("signal", (toId, message) => {
-            io.to(toId).emit("signal", socket.id, message);
-        });
-
-        socket.on("chat-message", (data, sender) => {
-            const [matchingRoom, found] = Object.entries(connections)
-                .reduce(([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) {
-                        return [roomKey, true];
-                    }
-                    return [room, isFound];
-                }, ['', false]);
-
-            if (found === true) {
-                if (messages[matchingRoom] === undefined) {
-                    messages[matchingRoom] = [];
-                }
-                messages[matchingRoom].push({ 'sender': sender, "data": data, "socket-id-sender": socket.id });
-                console.log("message", matchingRoom, ":", sender, data);
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("chat-message", data, sender, socket.id);
                 });
             }
         });
 
-        socket.on("disconnect", () => {
-            var diffTime = Math.abs(timeOnLine[socket.id] - new Date());
-            var key;
+        /**
+         * WebRTC SDP & ICE Candidate signaling relay.
+         */
+        clientSocket.on("signal", (targetPeerId, signalPayload) => {
+            ioServer.to(targetPeerId).emit("signal", clientSocket.id, signalPayload);
+        });
 
-            for (const [k, v] of Object.entries(connections)) {
-                for (let a = 0; a < v.length; ++a) {
-                    if (v[a] === socket.id) {
-                        key = k;
+        /**
+         * Handle instantaneous bi-directional text chat within rooms.
+         */
+        clientSocket.on("chat-message", (messageData, senderAlias) => {
+            const currentRoom = Object.keys(activePeerNetwork).find(room => 
+                activePeerNetwork[room].includes(clientSocket.id)
+            );
 
-                        for (let a = 0; a < connections[key].length; ++a) {
-                            io.to(connections[key][a]).emit('user-left', socket.id);
-                        }
+            if (currentRoom) {
+                if (!roomMessageCache[currentRoom]) {
+                    roomMessageCache[currentRoom] = [];
+                }
+                
+                roomMessageCache[currentRoom].push({ 
+                    sender: senderAlias, 
+                    data: messageData, 
+                    socketIdSender: clientSocket.id 
+                });
 
-                        var index = connections[key].indexOf(socket.id);
+                activePeerNetwork[currentRoom].forEach((peerId) => {
+                    ioServer.to(peerId).emit("chat-message", messageData, senderAlias, clientSocket.id);
+                });
+            }
+        });
 
-                        connections[key].splice(index, 1);
+        /**
+         * Teardown and memory cleanup pipeline upon peer disconnection.
+         */
+        clientSocket.on("disconnect", () => {
+            Object.keys(activePeerNetwork).forEach((roomKey) => {
+                const peerIndex = activePeerNetwork[roomKey].indexOf(clientSocket.id);
+                
+                if (peerIndex !== -1) {
+                    activePeerNetwork[roomKey].forEach((peerId) => {
+                        ioServer.to(peerId).emit('user-left', clientSocket.id);
+                    });
 
-                        if (connections[key].length === 0) {
-                            delete connections[key];
-                        }
+                    activePeerNetwork[roomKey].splice(peerIndex, 1);
+
+                    if (activePeerNetwork[roomKey].length === 0) {
+                        delete activePeerNetwork[roomKey];
+                        delete roomMessageCache[roomKey]; // Clean up memory
                     }
                 }
-            }
+            });
+            
+            // Clean up global maps
+            delete clientIdentityMap[clientSocket.id];
+            delete clientHardwareStateMap[clientSocket.id];
+            delete peerConnectionTimestamps[clientSocket.id];
         });
     });
 
-    return io;
+    return ioServer;
 }
 export default connectToSocket;

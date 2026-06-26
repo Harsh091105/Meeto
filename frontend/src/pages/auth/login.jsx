@@ -23,6 +23,8 @@ const Login = () => {
         password: password
       });
       if (response.status == 200) {
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("username", username);
         alert("Login Successful! Welcome back.");
         navigate('/');
       }

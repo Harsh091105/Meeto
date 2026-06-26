@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import userRoutes from "./routes/user.routes.js"
+import meetingRoutes from "./routes/meeting.routes.js"
 import {createServer} from "node:http";
 
 import{connectToSocket} from "./controllers/socketManager.js";
@@ -19,6 +20,7 @@ app.use(express.json({limit:"40kb"}));
 app.use(express.urlencoded({limit:"40kb",extended:true}));
 
 app.use("/api/v1/users",userRoutes);
+app.use("/api/v1/meetings", meetingRoutes);
 
 app.get("/home",(req,res)=>{
     return res.json({"hello":"world"})
