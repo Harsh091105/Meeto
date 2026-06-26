@@ -32,7 +32,7 @@ const LandingPage = () => {
     const sanitizedCode = targetRoomIdentifier.trim();
     if (sanitizedCode.length > 0) {
       try {
-        const validationPayload = await axios.get(`https://meeto-8b38.onrender.com/api/v1/meetings/validate/${sanitizedCode}`);
+        const validationPayload = await axios.get(`https://meeto-backend.onrender.com/api/v1/meetings/validate/${sanitizedCode}`);
         if (validationPayload.status === 200) {
           routerNavigate(`/${sanitizedCode}`);
         }
@@ -51,7 +51,7 @@ const LandingPage = () => {
   const provisionNewMeeting = async () => {
     try {
       const activeToken = localStorage.getItem("token");
-      const creationResponse = await axios.post("https://meeto-8b38.onrender.com/api/v1/meetings/create", { token: activeToken });
+      const creationResponse = await axios.post("https://meeto-backend.onrender.com/api/v1/meetings/create", { token: activeToken });
       
       if (creationResponse.status === 201) {
         routerNavigate(`/${creationResponse.data.meetingCode}`);

@@ -18,7 +18,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post("https://meeto-8b38.onrender.com/api/v1/users/login", {
+      const response = await axios.post("https://meeto-backend.onrender.com/api/v1/users/login", {
         username: username,
         password: password
       });

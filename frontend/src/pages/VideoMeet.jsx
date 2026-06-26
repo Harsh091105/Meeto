@@ -12,7 +12,7 @@ import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import ChatIcon from "@mui/icons-material/Chat";
 
-const server_url = "https://meeto-8b38.onrender.com";
+const server_url = "https://meeto-backend.onrender.com";
 const activePeerNetwork = {};
 const peerConfigConnections = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -354,7 +354,7 @@ export default function VideoMeetComponent() {
 
         const validateRoom = async () => {
             try {
-                const response = await axios.get(`https://meeto-8b38.onrender.com/api/v1/meetings/validate/${url}`);
+                const response = await axios.get(`https://meeto-backend.onrender.com/api/v1/meetings/validate/${url}`);
                 if (response.status === 200) {
                     const storedUsername = sessionStorage.getItem("meeto_username");
                     

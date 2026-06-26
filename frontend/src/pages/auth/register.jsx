@@ -20,7 +20,7 @@ export default function Register() {
         setErrorMessage("");
         setIsLoading(true);
         try {
-            const response = await axios.post("https://meeto-8b38.onrender.com/api/v1/users/register",
+            const response = await axios.post("https://meeto-backend.onrender.com/api/v1/users/register",
                 {
                     name: fullName,
                     username: username,
