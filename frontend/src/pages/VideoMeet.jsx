@@ -16,7 +16,13 @@ import ChatIcon from "@mui/icons-material/Chat";
 
 const activePeerNetwork = {};
 const peerConfigConnections = {
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+    ],
 };
 
 let blackTrack = null;
@@ -153,7 +159,9 @@ export default function VideoMeetComponent() {
 
     const initializeRealtimeMesh = () => {
         const activeAlias = sessionStorage.getItem("meeto_username") || username || "User";
-        socketRef.current = io.connect(server_url);
+        socketRef.current = io(server_url, {
+            transports: ["websocket"],
+        });
         socketRef.current.on("signal", processIncomingSignalingPayload);
 
         socketRef.current.on("chat-message", (data, sender, senderId) => {
@@ -195,6 +203,7 @@ export default function VideoMeetComponent() {
 
             socketRef.current.on("user-joined", (id, clients, roomUsers) => {
                 clients.forEach((socketListId) => {
+                    if (socketListId === socketIdRef.current) return; // skip self
                     if (!activePeerNetwork[socketListId]) {
                         const pc = new RTCPeerConnection(peerConfigConnections);
                         activePeerNetwork[socketListId] = pc;
@@ -367,7 +376,7 @@ export default function VideoMeetComponent() {
                             if (!isMounted) return;
                             await getPermissions();
                             if (!isMounted) return;
-                            connectToSocketServer();
+                            initializeRealtimeMesh();
                         };
                         init();
                     }

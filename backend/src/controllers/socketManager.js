@@ -16,8 +16,8 @@ export const connectToSocket = (httpServer) => {
             origin: "*",
             methods: ["GET", "POST"],
             allowedHeaders: ["*"],
-            credentials: true
-        }
+        },
+        transports: ["websocket", "polling"],
     });
 
     ioServer.on("connection", (clientSocket) => {
