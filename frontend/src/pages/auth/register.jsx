@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 
 import axios from "axios";
+import server_url from "../../environment.js";
 import './register.css';
 import regBg from '../../images/landingpage1.png';
 import { Link, useNavigate } from "react-router-dom";
@@ -20,7 +21,7 @@ export default function Register() {
         setErrorMessage("");
         setIsLoading(true);
         try {
-            const response = await axios.post("https://meeto-backend.onrender.com/api/v1/users/register",
+            const response = await axios.post(`${server_url}/api/v1/users/register`,
                 {
                     name: fullName,
                     username: username,

@@ -3,6 +3,7 @@ import './login.css';
 import authBg from '../../images/landingpage1.png';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from "axios"
+import server_url from "../../environment.js";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post("https://meeto-backend.onrender.com/api/v1/users/login", {
+      const response = await axios.post(`${server_url}/api/v1/users/login`, {
         username: username,
         password: password
       });
