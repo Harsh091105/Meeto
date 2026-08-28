@@ -159,16 +159,34 @@ export default function VideoMeetComponent() {
         const peerInstance = activePeerNetwork[senderIdentity];
         if (!peerInstance) return;
 
-        if (parsedSignal.sdp) {
-            await peerInstance.setRemoteDescription(new RTCSessionDescription(parsedSignal.sdp));
-            if (parsedSignal.sdp.type === "offer") {
-                const answerPayload = await peerInstance.createAnswer();
-                await peerInstance.setLocalDescription(answerPayload);
-                socketRef.current.emit("signal", senderIdentity, JSON.stringify({ sdp: peerInstance.localDescription }));
+        try {
+            if (parsedSignal.sdp) {
+                await peerInstance.setRemoteDescription(new RTCSessionDescription(parsedSignal.sdp));
+                if (parsedSignal.sdp.type === "offer") {
+                    const answerPayload = await peerInstance.createAnswer();
+                    await peerInstance.setLocalDescription(answerPayload);
+                    socketRef.current.emit("signal", senderIdentity, JSON.stringify({ sdp: peerInstance.localDescription }));
+                }
+                
+                // Process any queued ICE candidates now that remote description is set
+                if (peerInstance.iceQueue) {
+                    for (const ice of peerInstance.iceQueue) {
+                        await peerInstance.addIceCandidate(new RTCIceCandidate(ice)).catch(e => console.error("Queued ICE error:", e));
+                    }
+                    peerInstance.iceQueue = [];
+                }
             }
-        }
-        if (parsedSignal.ice) {
-            await peerInstance.addIceCandidate(new RTCIceCandidate(parsedSignal.ice));
+            if (parsedSignal.ice) {
+                if (peerInstance.remoteDescription) {
+                    await peerInstance.addIceCandidate(new RTCIceCandidate(parsedSignal.ice)).catch(e => console.error("ICE error:", e));
+                } else {
+                    // Queue ICE candidate if remote description is not set yet
+                    if (!peerInstance.iceQueue) peerInstance.iceQueue = [];
+                    peerInstance.iceQueue.push(parsedSignal.ice);
+                }
+            }
+        } catch (error) {
+            console.error("Signaling error:", error);
         }
     };
 
