@@ -367,11 +367,12 @@ export default function VideoMeetComponent() {
     const sendMessage = async () => {
         if (!chatInput.trim()) return;
 
-        if(chatInput.toLowerCase().startsWith("@ai ")){
-            const prompt = chatInput.substring(4);
+        const cleanInput = chatInput.trim();
+        if(cleanInput.toLowerCase().startsWith("@ai")){
+            const prompt = cleanInput.substring(3).trim();
 
             setMessages(prev => [...prev ,{
-                text: chatInput,
+                text: cleanInput,
                 sender :username || "User",
                 senderId: socketIdRef.current,
                 time: new Date().toLocaleTimeString()
