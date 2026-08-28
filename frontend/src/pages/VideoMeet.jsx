@@ -349,8 +349,35 @@ export default function VideoMeetComponent() {
         navigate("/"); // Redirect to landing page
     };
 
-    const sendMessage = () => {
+    const sendMessage = async () => {
         if (!chatInput.trim()) return;
+
+        if(chatInput.startsWith("@AI ")){
+            const prompt =chatInput.replace("@AI ","");
+
+            setMessages(prev => [...prev ,{
+                text: chatInput,
+                sender :username || "User",
+                senderId: socketIdRef.current,
+                time: new Date().toLocaleTimeString()
+            }]);
+            setChatInput("");
+
+            try {
+                const response =await axios.post(`${server_url}/api/v1/ai/ask`, {prompt: prompt});
+
+                setMessages(prev =>[...prev,{
+                    text: response.data.answer,
+                    sender: "🤖 AI Assistant",
+                    senderId: "ai-bot",
+                    time:new Date().toLocaleTimeString(),
+                    isPrivate: true
+                }]);
+            }catch (error){
+                console.error("Failed to ask AI : ",error);
+            }
+            return ;
+        }
 
         socketRef.current.emit("chat-message", chatInput, username || "User");
 

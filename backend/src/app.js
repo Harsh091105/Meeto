@@ -4,6 +4,7 @@ import cors from "cors";
 import userRoutes from "./routes/user.routes.js"
 import meetingRoutes from "./routes/meeting.routes.js"
 import {createServer} from "node:http";
+import aiRoutes from "./routes/ai.routes.js";
 
 import{connectToSocket} from "./controllers/socketManager.js";
 
@@ -21,6 +22,7 @@ app.use(express.urlencoded({limit:"40kb",extended:true}));
 
 app.use("/api/v1/users",userRoutes);
 app.use("/api/v1/meetings", meetingRoutes);
+app.use("/api/v1/ai",aiRoutes);
 
 app.get("/", (req, res) => {
     return res.json({ "message": "Backend is up and running!" });
